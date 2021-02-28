@@ -9,9 +9,8 @@ defmodule MavuList do
 
   use Accessible
 
-  @default_per_page 6
-
-  require Ecto.Query
+  @default_per_page 20
+  require(Ecto.Query)
 
   def process_list(source, source_id, conf) do
     generate_state(source_id, conf)
@@ -71,21 +70,35 @@ defmodule MavuList do
   def handle_data(%__MODULE__{} = state, source) do
     state = state |> prepare_metadata(source)
 
-    filtered_data =
+    filtered_source =
       source
+      |> apply_filter(state.conf, state.tweaks)
       |> apply_sort(state.conf, get_sort_tweaks(state))
+
+    paged_source =
+      filtered_source
       |> apply_paging(state.conf, state.metadata.per_page, state.metadata.page)
 
     state
-    |> update_with_filtered_data(source, filtered_data)
-    |> update_metadata(source)
+    |> update_data(source, paged_source)
+    |> update_metadata(filtered_source)
   end
+
+  def apply_filter(source, %{filter: filter} = conf, tweaks) do
+    apply(filter, [source, conf, tweaks])
+  end
+
+  def apply_filter(source, _, _), do: source
 
   def apply_sort(data, conf, [[colname, direction]]) when is_map(conf) and is_list(data),
     do: Enum.sort_by(data, &get_colval(&1, conf, colname), direction)
 
-  def apply_sort(data, conf, [[_colname, _direction]]) when is_map(conf) do
-    data
+  def apply_sort(%Ecto.Query{} = query, conf, [[colname, direction]]) when is_map(conf) do
+    db_colname = get_db_colname(conf, colname)
+
+    query
+    |> Ecto.Query.exclude(:order_by)
+    |> Ecto.Query.order_by([{^direction, ^db_colname}])
   end
 
   def apply_sort(data, _, _), do: data
@@ -93,6 +106,7 @@ defmodule MavuList do
   def apply_paging(%Ecto.Query{} = query, %{repo: repo} = _conf, per_page, page)
       when is_integer(per_page) and is_integer(page) do
     query
+    |> IO.inspect(label: "mwuits-debug 2021-02-26_17:34 ")
     |> Ecto.Query.limit(^per_page)
     |> Ecto.Query.offset(^(per_page * (page - 1)))
     |> repo.all()
@@ -105,6 +119,17 @@ defmodule MavuList do
 
   def sort_by(data, conf, _) when is_map(conf) do
     data
+  end
+
+  def is_user_sortable?(conf, name) when is_map(conf) and is_atom(name) do
+    if get_col_conf(conf, name)[:user_sortable] == false do
+      false
+    else
+      case get_db_colname(conf, name) do
+        nil -> false
+        _valid_colname -> true
+      end
+    end
   end
 
   def get_colval(row, conf, name) when is_map(row) do
@@ -122,6 +147,20 @@ defmodule MavuList do
     end
   end
 
+  def get_db_colname(conf, name) when is_map(conf) and is_atom(name) do
+    get_col_conf(conf, name)
+    |> case do
+      %{path: [single_field_name]} when is_atom(single_field_name) ->
+        single_field_name
+
+      %{path: multiple_fieldnames} when is_list(multiple_fieldnames) ->
+        nil
+
+      _ ->
+        name
+    end
+  end
+
   def get_col_conf(conf, name) when is_map(conf) and is_atom(name) do
     get_in(conf, [
       :columns,
@@ -130,7 +169,7 @@ defmodule MavuList do
     |> List.first()
   end
 
-  def update_with_filtered_data(%__MODULE__{} = state, _source, filtered_data) do
+  def update_data(%__MODULE__{} = state, _source, filtered_data) do
     state
     |> put_in([:data], filtered_data)
   end
@@ -147,7 +186,8 @@ defmodule MavuList do
       label: get_label(col, name),
       direction: get_sort_direction_of_column(state, name),
       name: name,
-      target: get_target(state)
+      target: get_target(state),
+      is_user_sortable: is_user_sortable?(state.conf, name)
     }
   end
 
@@ -161,6 +201,13 @@ defmodule MavuList do
       items_to: min(state.metadata.total_count, state.metadata.per_page * state.metadata.page),
       has_next: state.metadata.page < ceil(state.metadata.total_count / state.metadata.per_page),
       has_prev: state.metadata.page > 1,
+      target: get_target(state)
+    }
+  end
+
+  def generate_assigns_for_searchbox_component(%__MODULE__{} = state) do
+    %{
+      keyword: "",
       target: get_target(state)
     }
   end
@@ -206,23 +253,11 @@ defmodule MavuList do
     # state.tweaks |> IO.inspect(label: "mwuits-debug 2021-02-07_23:12 TWEAKS")
     state
     |> put_in([:tweaks, :sort_by], [[name, new_direction]])
+    |> put_in([:tweaks, :page], 1)
     |> handle_data(source)
   end
 
   def handle_event("set_page", %{"page" => page}, source, %__MODULE__{} = state) do
-    # msg |> IO.inspect(label: "mwuits-debug 2021-02-07_23:19 SET PAGE ")
-
-    # name = msg["name"] |> String.to_existing_atom()
-
-    # new_direction =
-    #   case get_sort_direction_of_column(state, name) do
-    #     :asc -> :desc
-    #     :desc -> :asc
-    #     _ -> default_sort(state)
-    #   end
-
-    # # state.tweaks |> IO.inspect(label: "mwuits-debug 2021-02-07_23:12 TWEAKS")
-
     pagenum =
       MavuUtils.to_int(page)
       |> case do
@@ -232,6 +267,13 @@ defmodule MavuList do
 
     state
     |> put_in([:tweaks, :page], pagenum)
+    |> handle_data(source)
+  end
+
+  def handle_event("set_keyword", %{"keyword" => keyword}, source, %__MODULE__{} = state) do
+    state
+    |> put_in([:tweaks, :keyword], String.trim(keyword))
+    |> put_in([:tweaks, :page], 1)
     |> handle_data(source)
   end
 

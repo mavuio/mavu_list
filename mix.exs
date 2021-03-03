@@ -1,14 +1,19 @@
 defmodule MavuList.MixProject do
   use Mix.Project
 
-  @version "0.1.3"
+  @version "0.1.4"
   def project do
     [
       app: :mavu_list,
       version: @version,
-      elixir: "~> 1.10",
+      elixir: "~> 1.0",
+      build_embedded: Mix.env() == :prod,
       start_permanent: Mix.env() == :prod,
-      deps: deps()
+      description: description(),
+      package: package(),
+      deps: deps(),
+      name: "MavuList",
+      source_url: "https://github.com/mavuio/mavu_list"
     ]
   end
 
@@ -30,6 +35,18 @@ defmodule MavuList.MixProject do
       {:mavu_utils, "~> 0.1"},
       {:accessible, ">= 0.2.0"},
       {:ecto, ">= 3.0.0"}
+    ]
+  end
+
+  defp description() do
+    "List helpers used in other upcoming packages under mavuio/\*"
+  end
+
+  defp package() do
+    [
+      files: ~w(lib .formatter.exs mix.exs README*),
+      licenses: ["Apache-2.0"],
+      links: %{"GitHub" => "https://github.com/mavuio/mavu_list"}
     ]
   end
 end

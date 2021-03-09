@@ -277,6 +277,11 @@ defmodule MavuList do
     |> handle_data(source)
   end
 
+  def handle_event("reprocess", _, source, %__MODULE__{} = state) do
+    state
+    |> handle_data(source)
+  end
+
   def default_sort(%__MODULE__{} = _state), do: :asc
 
   def handle_event(event, msg, %__MODULE__{} = state) do

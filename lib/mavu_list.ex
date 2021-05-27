@@ -91,7 +91,7 @@ defmodule MavuList do
   def apply_filter(source, _, _), do: source
 
   def apply_sort(data, conf, [[colname, direction]]) when is_map(conf) and is_list(data),
-    do: Enum.sort_by(data, &get_colval(&1, conf, colname), direction)
+    do: Enum.sort_by(data, &get_sortable_colval(&1, conf, colname), direction)
 
   def apply_sort(%Ecto.Query{} = query, conf, [[colname, direction]]) when is_map(conf) do
     db_colname = get_db_colname(conf, colname)
@@ -106,13 +106,13 @@ defmodule MavuList do
   def apply_paging(%Ecto.Query{} = query, %{repo: repo} = _conf, per_page, page)
       when is_integer(per_page) and is_integer(page) do
     query
-    |> IO.inspect(label: "mwuits-debug 2021-02-26_17:34 ")
+    # |> IO.inspect(label: "mwuits-debug 2021-02-26_17:34 ")
     |> Ecto.Query.limit(^per_page)
     |> Ecto.Query.offset(^(per_page * (page - 1)))
     |> repo.all()
   end
 
-  def apply_paging(data, per_page, page)
+  def apply_paging(data, _conf, per_page, page)
       when is_integer(per_page) and is_integer(page) and is_list(data) do
     Enum.slice(data, per_page * (page - 1), per_page)
   end
@@ -129,6 +129,14 @@ defmodule MavuList do
         nil -> false
         _valid_colname -> true
       end
+    end
+  end
+
+  def get_sortable_colval(row, conf, name) when is_map(row) do
+    get_colval(row, conf, name)
+    |> case do
+      str when is_binary(str) -> String.downcase(str)
+      val -> val
     end
   end
 

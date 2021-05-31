@@ -12,22 +12,18 @@ defmodule MavuList do
   @default_per_page 20
   require(Ecto.Query)
 
-  def process_list(source, source_id, conf) do
-    generate_state(source_id, conf)
+  def process_list(source, source_id, conf, tweaks \\ %{}) do
+    generate_state(source_id, conf, tweaks)
     |> handle_columns()
     |> handle_data(source)
-
-    # |> Eigenart.EaError.die(label: "mwuits-debug 2021-02-26_16:23 ")
-
-    # |> Eigenart.EaError.die(label: "mwuits-debug 2021-02-07_16:35 ")
   end
 
-  def generate_state(source_id, conf \\ %{}) do
+  def generate_state(source_id, conf \\ %{}, tweaks \\ %{}) do
     %__MODULE__{
       data: [],
       metadata: %{},
       conf: conf,
-      tweaks: %{},
+      tweaks: tweaks || %{},
       source_id: source_id
     }
   end

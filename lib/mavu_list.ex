@@ -242,7 +242,8 @@ defmodule MavuList do
 
   def get_label(nil, name) when is_atom(name), do: Phoenix.Naming.humanize(name)
 
-  def get_col(%__MODULE__{} = state, name) when is_atom(name), do: state.metadata.columns[name]
+  def get_col(%__MODULE__{} = state, name) when is_atom(name),
+    do: state.metadata.columns |> Enum.find(&(&1.name == name))
 
   def handle_event("toggle_column", msg, source, %__MODULE__{} = state) do
     name = msg["name"] |> String.to_existing_atom()

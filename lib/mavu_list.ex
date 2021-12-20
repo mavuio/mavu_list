@@ -97,6 +97,20 @@ defmodule MavuList do
     |> Ecto.Query.order_by([{^direction, ^db_colname}])
   end
 
+  def apply_sort(%Ecto.Query{} = query, conf, sort_definitions)
+      when is_list(sort_definitions) and is_map(conf) do
+    sort_definitions_for_query = Enum.map(sort_definitions, &handle_sort_definition(&1, conf))
+
+    query
+    |> Ecto.Query.exclude(:order_by)
+    |> Ecto.Query.order_by(^sort_definitions_for_query)
+  end
+
+  def handle_sort_definition([colname, direction], conf) do
+    db_colname = get_db_colname(conf, colname)
+    {direction, db_colname}
+  end
+
   def apply_sort(data, _, _), do: data
 
   def apply_paging(%Ecto.Query{} = query, %{repo: repo} = _conf, per_page, page)

@@ -89,13 +89,13 @@ defmodule MavuList do
   def apply_sort(data, conf, [[colname, direction]]) when is_map(conf) and is_list(data),
     do: Enum.sort_by(data, &get_sortable_colval(&1, conf, colname), direction)
 
-  def apply_sort(%Ecto.Query{} = query, conf, [[colname, direction]]) when is_map(conf) do
-    db_colname = get_db_colname(conf, colname)
+  # def apply_sort(%Ecto.Query{} = query, conf, [[colname, direction]]) when is_map(conf) do
+  #   db_colname = get_db_colname(conf, colname)
 
-    query
-    |> Ecto.Query.exclude(:order_by)
-    |> Ecto.Query.order_by([{^direction, ^db_colname}])
-  end
+  #   query
+  #   |> Ecto.Query.exclude(:order_by)
+  #   |> Ecto.Query.order_by([{^direction, ^db_colname}])
+  # end
 
   def apply_sort(%Ecto.Query{} = query, conf, sort_definitions)
       when is_list(sort_definitions) and is_map(conf) do
@@ -168,6 +168,9 @@ defmodule MavuList do
   def get_db_colname(conf, name) when is_map(conf) and is_atom(name) do
     get_col_conf(conf, name)
     |> case do
+      %{order_by_field: order_by_field} when not is_nil(order_by_field) ->
+        order_by_field
+
       %{path: [single_field_name]} when is_atom(single_field_name) ->
         single_field_name
 

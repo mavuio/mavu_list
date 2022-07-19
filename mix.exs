@@ -1,7 +1,7 @@
 defmodule MavuList.MixProject do
   use Mix.Project
 
-  @version "0.1.11"
+  @version "0.2.1"
   def project do
     [
       app: :mavu_list,

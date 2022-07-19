@@ -1,0 +1,13 @@
+lockfileVersion: 5.3
+
+specifiers:
+  sortablejs: ^1.14.0
+
+dependencies:
+  sortablejs: 1.15.0
+
+packages:
+
+  /sortablejs/1.15.0:
+    resolution: {integrity: sha512-bv9qgVMjUMf89wAvM6AxVvS/4MX3sPeN0+agqShejLU5z5GX4C75ow1O2e5k4L6XItUyAK3gH6AxSbXrOM5e8w==}
+    dev: false

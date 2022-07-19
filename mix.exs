@@ -31,9 +31,14 @@ defmodule MavuList.MixProject do
       # {:dep_from_git, git: "https://github.com/elixir-lang/my_dep.git", tag: "0.1.0"}
       {:pit, "~> 1.2.0"},
       {:phoenix_html, ">= 2.0.0"},
-      {:phoenix, ">= 1.5.0"},
+      {:phoenix, ">= 1.6.0"},
+      {:phoenix_live_view, ">= 0.17.2"},
+      {:mavu_form, "~> 0.1.0"},
       {:mavu_utils, "~> 0.1"},
       {:accessible, ">= 0.2.0"},
+      {:jason, ">= 1.2.0"},
+      {:atomic_map, ">= 0.8.0"},
+      {:typed_struct, "~> 0.2.1"},
       {:ecto, ">= 3.0.0"},
       {:ex_doc, ">= 0.0.0", only: :dev, runtime: false}
     ]

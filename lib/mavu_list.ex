@@ -14,7 +14,6 @@ defmodule MavuList do
 
   def process_list(source, source_id, conf, tweaks \\ %{}) do
     generate_state(source_id, conf, tweaks)
-    |> handle_columns()
     |> handle_data(source)
   end
 
@@ -23,22 +22,74 @@ defmodule MavuList do
       data: [],
       metadata: %{},
       conf: conf,
-      tweaks: tweaks || %{},
+      tweaks: handle_incoming_tweaks(tweaks),
       source_id: source_id
     }
   end
 
-  def handle_columns(%__MODULE__{} = state) do
-    state
-    |> put_in([:metadata, :columns], get_columns_from_conf(state))
+  def handle_incoming_tweaks(encoded_tweaks) when is_binary(encoded_tweaks) do
+    encoded_tweaks
+    |> decode_tweaks_from_string()
+    |> MavuUtils.log("mwuits-debug 2022-07-19_09:11 TWEAKS IN", :info)
   end
+
+  def handle_incoming_tweaks(tweaks), do: tweaks || %{}
 
   def get_columns_from_conf(%__MODULE__{} = state) do
     state.conf.columns
+    |> handle_hidden_field_in_columns_conf()
+  end
+
+  defp handle_hidden_field_in_columns_conf(columns) when is_list(columns) do
+    columns
+    |> Enum.map(&handle_hidden_field_in_single_column_conf/1)
+  end
+
+  defp handle_hidden_field_in_single_column_conf(%{hidden: hidden} = conf) do
+    case hidden do
+      a when a in ["no", "false", false, :no] -> %{visible: true, editable: true}
+      a when a in ["yes", "true", true, :yes] -> %{visible: false, editable: true}
+      "never" -> %{visible: true, editable: false}
+      "always" -> %{visible: false, editable: false}
+    end
+    |> Map.merge(conf)
+  end
+
+  defp handle_hidden_field_in_single_column_conf(conf) when is_map(conf) do
+    %{visible: true, editable: true}
+    |> Map.merge(conf)
+  end
+
+  def get_columns_with_tweaks_applied(%__MODULE__{} = state) do
+    get_columns_from_conf(state)
+    |> apply_column_tweaks(get_column_tweaks(state))
+  end
+
+  def apply_column_tweaks(columns, column_tweaks)
+      when is_list(columns) and is_list(column_tweaks) do
+    tweaks_w_index = Enum.with_index(column_tweaks)
+
+    Enum.with_index(columns, 100)
+    |> Enum.map(fn {col, col_idx} ->
+      Enum.find(tweaks_w_index, fn {i, _tweak_idx} -> i.name == "#{col.name}" end)
+      |> case do
+        {%{visible: visible_from_tweak}, tweak_idx} ->
+          {Map.put(col, :visible, visible_from_tweak), tweak_idx}
+
+        _ ->
+          {col, col_idx}
+      end
+    end)
+    |> Enum.sort_by(fn {_, idx} -> idx end)
+    |> Enum.map(fn {col, _} -> col end)
   end
 
   def prepare_metadata(state, _source) do
     state
+    |> put_in(
+      [:metadata, :columns],
+      get_columns_with_tweaks_applied(state) |> Enum.filter(& &1.visible)
+    )
     |> put_in(
       [:metadata, :page],
       get_in(state, [:tweaks, :page]) |> MavuUtils.if_nil(1)
@@ -197,8 +248,10 @@ defmodule MavuList do
 
   def get_length(source, _) when is_list(source), do: length(source)
 
-  def get_length(%Ecto.Query{} = query, %{repo: repo} = _conf),
-    do: query |> repo.aggregate(:count)
+  def get_length(%Ecto.Query{} = query, %{repo: repo} = _conf) do
+    MavuList.Totals.total_entries(query, repo, [])
+    # query |> repo.aggregate(:count)
+  end
 
   def generate_assigns_for_label_component(%__MODULE__{} = state, name) when is_atom(name) do
     col = get_col(state, name)
@@ -228,7 +281,7 @@ defmodule MavuList do
 
   def generate_assigns_for_searchbox_component(%__MODULE__{} = state) do
     %{
-      keyword: "",
+      keyword: state.tweaks[:keyword] || "",
       target: get_target(state)
     }
   end
@@ -254,6 +307,13 @@ defmodule MavuList do
     end
   end
 
+  def get_column_tweaks(%__MODULE__{} = state) do
+    case state.tweaks[:columns] do
+      items when is_list(items) -> items
+      _ -> []
+    end
+  end
+
   def get_label(col, name) when is_atom(name) and is_map(col),
     do: col[:label] || get_label(nil, name)
 
@@ -262,7 +322,27 @@ defmodule MavuList do
   def get_col(%__MODULE__{} = state, name) when is_atom(name),
     do: state.metadata.columns |> Enum.find(&(&1.name == name))
 
-  def handle_event("toggle_column", msg, source, %__MODULE__{} = state) do
+  def handle_event(event, msg, source, %__MODULE__{} = state) do
+    # version A) handle state only
+    handle_event_in_state(event, msg, source, state)
+  end
+
+  def handle_event(socket, event, msg, source, fieldname) when is_atom(fieldname) do
+    # version B) handle socket
+    socket
+    |> Phoenix.LiveView.assign(
+      fieldname,
+      handle_event_in_state(
+        event,
+        msg,
+        source,
+        socket.assigns[fieldname]
+      )
+    )
+    |> update_param_in_url(fieldname)
+  end
+
+  def handle_event_in_state("toggle_column", msg, source, %__MODULE__{} = state) do
     name = msg["name"] |> String.to_existing_atom()
 
     new_direction =
@@ -277,9 +357,44 @@ defmodule MavuList do
     |> put_in([:tweaks, :sort_by], [[name, new_direction]])
     |> put_in([:tweaks, :page], 1)
     |> handle_data(source)
+
+    # |> update_param_in_url(source)
   end
 
-  def handle_event("set_page", %{"page" => page}, source, %__MODULE__{} = state) do
+  def handle_event_in_state(
+        "set_columns",
+        %{"fdata" => %{"columns" => incoming_columns, "col_order" => col_order_str}},
+        source,
+        %__MODULE__{} = state
+      ) do
+    cols_with_index =
+      incoming_columns
+      |> Map.to_list()
+      |> Enum.map(fn {idx, col} -> {MavuUtils.to_int(idx), col} end)
+
+    cols_with_index =
+      if(col_order_str) do
+        cols_with_index
+        |> apply_order_to_cols_with_index(col_order_str)
+      else
+        cols_with_index
+      end
+
+    columns =
+      cols_with_index
+      |> Enum.sort_by(fn {idx, _} -> idx end)
+      |> Enum.map(fn {_, col} ->
+        %{name: col["name"], visible: MavuUtils.true?(col["visible"])}
+      end)
+
+    state
+    |> put_in([:tweaks, :columns], columns)
+    |> handle_data(source)
+
+    # |> update_param_in_url(source)
+  end
+
+  def handle_event_in_state("set_page", %{"page" => page}, source, %__MODULE__{} = state) do
     pagenum =
       MavuUtils.to_int(page)
       |> case do
@@ -290,25 +405,106 @@ defmodule MavuList do
     state
     |> put_in([:tweaks, :page], pagenum)
     |> handle_data(source)
+
+    # |> update_param_in_url(source)
   end
 
-  def handle_event("set_keyword", %{"keyword" => keyword}, source, %__MODULE__{} = state) do
+  def handle_event_in_state("set_keyword", %{"keyword" => keyword}, source, %__MODULE__{} = state) do
     state
     |> put_in([:tweaks, :keyword], String.trim(keyword))
     |> put_in([:tweaks, :page], 1)
     |> handle_data(source)
+
+    # |> update_param_in_url(source)
   end
 
-  def handle_event("reprocess", _, source, %__MODULE__{} = state) do
+  def handle_event_in_state("reprocess", _, source, %__MODULE__{} = state) do
     state
     |> handle_data(source)
   end
 
+  def update_param_in_url(socket, fieldname) when is_atom(fieldname) do
+    socket
+    |> Phoenix.LiveView.push_event("update_param_in_url", %{
+      name: get_url_param_name(fieldname),
+      value: encode_tweaks_to_string(socket.assigns[fieldname][:tweaks])
+    })
+  end
+
+  def get_url_param_name(fieldname) when is_atom(fieldname) or is_binary(fieldname) do
+    "#{fieldname}_tweaks"
+  end
+
+  defp encode_tweaks_to_string(tweaks) when is_map(tweaks) do
+    tweaks |> MavuUtils.log("mwuits-debug 2022-07-19_09:13 encode_tweaks_to_string", :info)
+    Jason.encode!(tweaks)
+  end
+
+  defp decode_tweaks_from_string(tweaks_str) when is_binary(tweaks_str) do
+    Jason.decode!(tweaks_str)
+    |> decode_sort_tweaks()
+    |> decode_page_tweaks()
+    |> decode_column_tweaks()
+    |> decode_keyword_tweaks()
+    |> MavuUtils.log("mwuits-debug 2022-07-19_09:20 decode_tweaks_from_string", :info)
+  end
+
+  defp decode_sort_tweaks(%{"sort_by" => sort_by} = tweaks) do
+    tweaks
+    |> Map.drop(["sort_by"])
+    |> Map.put(
+      :sort_by,
+      sort_by
+      |> Enum.map(fn [col, dir] ->
+        [String.to_existing_atom(col), String.to_existing_atom(dir)]
+      end)
+    )
+  end
+
+  defp decode_sort_tweaks(tweaks), do: tweaks
+
+  defp decode_page_tweaks(%{"page" => page} = tweaks) do
+    tweaks
+    |> Map.drop(["page"])
+    |> Map.put(:page, page)
+  end
+
+  defp decode_page_tweaks(tweaks), do: tweaks
+
+  defp decode_keyword_tweaks(%{"keyword" => keyword} = tweaks) do
+    tweaks
+    |> Map.drop(["keyword"])
+    |> Map.put(:keyword, keyword)
+  end
+
+  defp decode_keyword_tweaks(tweaks), do: tweaks
+
+  defp decode_column_tweaks(%{"columns" => columns} = tweaks) do
+    tweaks
+    |> Map.drop(["columns"])
+    |> Map.put(:columns, columns |> AtomicMap.convert(safe: true, ignore: true))
+  end
+
+  defp decode_column_tweaks(tweaks), do: tweaks
+
   def default_sort(%__MODULE__{} = _state), do: :asc
 
-  def handle_event(event, msg, %__MODULE__{} = state) do
+  def handle_event_in_state(event, msg, %__MODULE__{} = state) do
     {event, msg} |> IO.inspect(label: "unknown mavu_list event")
 
     state
+  end
+
+  defp apply_order_to_cols_with_index(cols_with_index, col_order_str)
+       when is_list(cols_with_index) and is_binary(col_order_str) do
+    pos_map = col_order_str |> String.split(",")
+
+    cols_with_index
+    |> Enum.map(fn {idx, col} ->
+      case Enum.find_index(pos_map, &(&1 == col["name"])) do
+        nil -> {idx, col}
+        new_idx -> {new_idx, col}
+      end
+    end)
   end
 end

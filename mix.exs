@@ -1,7 +1,7 @@
 defmodule MavuList.MixProject do
   use Mix.Project
 
-  @version "0.2.1"
+  @version "0.2.2"
   def project do
     [
       app: :mavu_list,
@@ -50,7 +50,7 @@ defmodule MavuList.MixProject do
 
   defp package() do
     [
-      files: ~w(lib .formatter.exs mix.exs README*),
+      files: ~w(lib .formatter.exs mix.exs assets README*),
       licenses: ["Apache-2.0"],
       links: %{"GitHub" => "https://github.com/mavuio/mavu_list"}
     ]

@@ -330,7 +330,7 @@ defmodule MavuList do
   def handle_event(socket, event, msg, source, fieldname) when is_atom(fieldname) do
     # version B) handle socket
     socket
-    |> Phoenix.LiveView.assign(
+    |> Phoenix.Component.assign(
       fieldname,
       handle_event_in_state(
         event,

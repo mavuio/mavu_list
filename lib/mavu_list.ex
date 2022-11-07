@@ -164,6 +164,18 @@ defmodule MavuList do
 
   def apply_sort(data, _, _), do: data
 
+
+  if Code.ensure_loaded?(Ash) do
+    def apply_paging(%Ash.Query{} = query, %{api: api} = _conf, per_page, page)
+    when is_integer(per_page) and is_integer(page) do
+      query
+      |> api.read!(page: [limit: per_page, offset: per_page * (page - 1)])
+      |> case do
+        items when is_list(items)-> items
+        %{results: items} -> items
+      end
+    end
+  end
   def apply_paging(%Ecto.Query{} = query, %{repo: repo} = _conf, per_page, page)
       when is_integer(per_page) and is_integer(page) do
     query
@@ -247,6 +259,13 @@ defmodule MavuList do
   end
 
   def get_length(source, _) when is_list(source), do: length(source)
+
+  if Code.ensure_loaded?(Ash) do
+    def get_length(%Ash.Query{} = query, %{api: api} = _conf) do
+      api.read!(query, page: [limit: 1,count: true])
+      |> Map.get(:count,0)
+    end
+  end
 
   def get_length(%Ecto.Query{} = query, %{repo: repo} = _conf) do
     MavuList.Totals.total_entries(query, repo, [])

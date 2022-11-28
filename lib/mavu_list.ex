@@ -157,25 +157,54 @@ defmodule MavuList do
     |> Ecto.Query.order_by(^sort_definitions_for_query)
   end
 
+  if Code.ensure_loaded?(Ash) do
+    def apply_sort(%Ash.Query{} = query, conf, sort_definitions)
+        when is_list(sort_definitions) and is_map(conf) do
+      sort_definitions_for_query =
+        Enum.map(sort_definitions, &handle_sort_definition_for_ash(&1, conf))
+
+      %{
+        sort_definitions: sort_definitions,
+        sort_definitions_for_query: sort_definitions_for_query
+      }
+
+      query
+      |> Ash.Query.unset(:sort)
+      |> Ash.Query.sort(sort_definitions_for_query)
+    end
+  end
+
   def handle_sort_definition([colname, direction], conf) do
     db_colname = get_db_colname(conf, colname)
     {direction, db_colname}
   end
 
-  def apply_sort(data, _, _), do: data
+  def handle_sort_definition_for_ash([colname, direction], conf) do
+    db_colname = get_db_colname(conf, colname)
 
+    case direction do
+      :asc ->
+        db_colname
+
+      _ ->
+        {db_colname, direction}
+    end
+  end
+
+  def apply_sort(data, _, _), do: data
 
   if Code.ensure_loaded?(Ash) do
     def apply_paging(%Ash.Query{} = query, %{api: api} = _conf, per_page, page)
-    when is_integer(per_page) and is_integer(page) do
+        when is_integer(per_page) and is_integer(page) do
       query
       |> api.read!(page: [limit: per_page, offset: per_page * (page - 1)])
       |> case do
-        items when is_list(items)-> items
+        items when is_list(items) -> items
         %{results: items} -> items
       end
     end
   end
+
   def apply_paging(%Ecto.Query{} = query, %{repo: repo} = _conf, per_page, page)
       when is_integer(per_page) and is_integer(page) do
     query
@@ -262,8 +291,8 @@ defmodule MavuList do
 
   if Code.ensure_loaded?(Ash) do
     def get_length(%Ash.Query{} = query, %{api: api} = _conf) do
-      api.read!(query, page: [limit: 1,count: true])
-      |> Map.get(:count,0)
+      api.read!(query, page: [limit: 1, count: true])
+      |> Map.get(:count, 0)
     end
   end
 

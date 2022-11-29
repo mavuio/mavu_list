@@ -405,8 +405,6 @@ defmodule MavuList do
     |> put_in([:tweaks, :sort_by], [[name, new_direction]])
     |> put_in([:tweaks, :page], 1)
     |> handle_data(source)
-
-    # |> update_param_in_url(source)
   end
 
   def handle_event_in_state(
@@ -438,8 +436,6 @@ defmodule MavuList do
     state
     |> put_in([:tweaks, :columns], columns)
     |> handle_data(source)
-
-    # |> update_param_in_url(source)
   end
 
   def handle_event_in_state("set_page", %{"page" => page}, source, %__MODULE__{} = state) do
@@ -453,8 +449,6 @@ defmodule MavuList do
     state
     |> put_in([:tweaks, :page], pagenum)
     |> handle_data(source)
-
-    # |> update_param_in_url(source)
   end
 
   def handle_event_in_state("set_keyword", %{"keyword" => keyword}, source, %__MODULE__{} = state) do
@@ -462,8 +456,6 @@ defmodule MavuList do
     |> put_in([:tweaks, :keyword], String.trim(keyword))
     |> put_in([:tweaks, :page], 1)
     |> handle_data(source)
-
-    # |> update_param_in_url(source)
   end
 
   def handle_event_in_state("reprocess", _, source, %__MODULE__{} = state) do
@@ -471,7 +463,25 @@ defmodule MavuList do
     |> handle_data(source)
   end
 
+  def update_param_in_url(
+        %{assigns: %{context: %{current_url: current_url}}} = socket,
+        fieldname
+      )
+      when is_atom(fieldname) do
+    # version A: use real push-event if @context is given in assigns
+    socket
+    |> Phoenix.LiveView.push_patch(
+      to:
+        MavuUtils.update_params_in_url(current_url, [
+          {get_url_param_name(fieldname),
+           encode_tweaks_to_string(socket.assigns[fieldname][:tweaks])}
+        ])
+    )
+  end
+
   def update_param_in_url(socket, fieldname) when is_atom(fieldname) do
+    # version B: update via JS only if no @context is given
+
     socket
     |> Phoenix.LiveView.push_event("update_param_in_url", %{
       name: get_url_param_name(fieldname),

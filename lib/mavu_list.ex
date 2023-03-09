@@ -257,6 +257,8 @@ defmodule MavuList do
     end
   end
 
+  def get_col_path(conf, path) when is_map(conf) and is_list(path), do: path
+
   def get_db_colname(conf, name) when is_map(conf) and is_atom(name) do
     get_col_conf(conf, name)
     |> case do
@@ -458,6 +460,29 @@ defmodule MavuList do
     |> handle_data(source)
   end
 
+  def handle_event_in_state(
+        "set_filter",
+        %{"filter_updates" => new_filter_values},
+        source,
+        %__MODULE__{} = state
+      )
+      when is_map(new_filter_values) do
+    cleaned_new_filter_values =
+      new_filter_values
+      |> AtomicMap.convert(safe: true, ignore: true)
+
+    state
+    |> update_in([:tweaks, :filters], fn old_filter_values ->
+      (old_filter_values || %{})
+      |> Map.merge(cleaned_new_filter_values)
+      |> Map.to_list()
+      |> Enum.filter(fn {_key, val} -> MavuUtils.present?(val) end)
+      |> Map.new()
+    end)
+    |> put_in([:tweaks, :page], 1)
+    |> handle_data(source)
+  end
+
   def handle_event_in_state("reprocess", _, source, %__MODULE__{} = state) do
     state
     |> handle_data(source)
@@ -469,14 +494,17 @@ defmodule MavuList do
       )
       when is_atom(fieldname) do
     # version A: use real push-event if @context is given in assigns
+    next_url =
+      MavuUtils.update_params_in_url(current_url, [
+        {get_url_param_name(fieldname),
+         encode_tweaks_to_string(socket.assigns[fieldname][:tweaks])}
+      ])
+
+    next_path =
+      next_url |> URI.parse() |> Map.take(~w(path query)a) |> Map.values() |> Enum.join("?")
+
     socket
-    |> Phoenix.LiveView.push_patch(
-      to:
-        MavuUtils.update_params_in_url(current_url, [
-          {get_url_param_name(fieldname),
-           encode_tweaks_to_string(socket.assigns[fieldname][:tweaks])}
-        ])
-    )
+    |> Phoenix.LiveView.push_patch(to: next_path)
   end
 
   def update_param_in_url(socket, fieldname) when is_atom(fieldname) do
@@ -504,6 +532,7 @@ defmodule MavuList do
     |> decode_page_tweaks()
     |> decode_column_tweaks()
     |> decode_keyword_tweaks()
+    |> decode_filter_tweaks()
     |> MavuUtils.log("mwuits-debug 2022-07-19_09:20 decode_tweaks_from_string", :info)
   end
 
@@ -536,6 +565,14 @@ defmodule MavuList do
   end
 
   defp decode_keyword_tweaks(tweaks), do: tweaks
+
+  defp decode_filter_tweaks(%{"filters" => filters} = tweaks) do
+    tweaks
+    |> Map.drop(["filters"])
+    |> Map.put(:filters, filters |> AtomicMap.convert(safe: true, ignore: true))
+  end
+
+  defp decode_filter_tweaks(tweaks), do: tweaks
 
   defp decode_column_tweaks(%{"columns" => columns} = tweaks) do
     tweaks

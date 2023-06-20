@@ -51,7 +51,6 @@ defmodule MavuListWeb do
       import Phoenix.Component
 
       # Import basic rendering functionality (render, render_layout, etc)
-      import Phoenix.View
 
       import MavuList.ErrorHelpers
       import MavuForm.InputHelpers

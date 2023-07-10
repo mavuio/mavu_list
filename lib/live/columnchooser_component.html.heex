@@ -4,7 +4,7 @@
   phx-hook="MavuListColumnChooserHook"
   x-data="mavu_list_column_chooser_component()"
 >
-  <.form :let={f} for={:fdata} url="#" phx_submit="list.set_columns" phx_target={@target}>
+  <.form :let={f} for={%{}} as={:fdata} phx-submit="list.set_columns" phx-target={@target}>
     <%= hidden_input(f, :col_order) %>
 
     <div x-ref="items">

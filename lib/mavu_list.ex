@@ -1,6 +1,9 @@
 defmodule MavuList do
   @moduledoc false
 
+
+  @derive {Inspect, only: [:conf]}
+
   defstruct data: [],
             metadata: %{},
             tweaks: %{},
@@ -120,6 +123,7 @@ defmodule MavuList do
     filtered_source =
       source
       |> apply_filter(state.conf, state.tweaks)
+      |> MavuList.Ash.apply_ash_filterform(state)
       |> apply_sort(state.conf, get_sort_tweaks(state))
 
     paged_source =
@@ -174,6 +178,8 @@ defmodule MavuList do
     end
   end
 
+  def apply_sort(data, _, _), do: data
+
   def handle_sort_definition([colname, direction], conf) do
     db_colname = get_db_colname(conf, colname)
     {direction, db_colname}
@@ -190,8 +196,6 @@ defmodule MavuList do
         {db_colname, direction}
     end
   end
-
-  def apply_sort(data, _, _), do: data
 
   if Code.ensure_loaded?(Ash) do
     def apply_paging(%Ash.Query{} = query, %{api: api} = _conf, per_page, page)
@@ -483,6 +487,22 @@ defmodule MavuList do
     |> handle_data(source)
   end
 
+
+
+  def handle_event_in_state(
+    "set_ash_filterform",
+    %{"filterform_params" => filterform_params},
+    source,
+    %__MODULE__{} = state
+  ) do
+
+    state
+    |> put_in([:tweaks, :ash_filterform], filterform_params )
+    |> put_in([:tweaks, :page], 1)
+    |> handle_data(source)
+end
+
+
   def handle_event_in_state("reprocess", _, source, %__MODULE__{} = state) do
     state
     |> handle_data(source)
@@ -533,6 +553,7 @@ defmodule MavuList do
     |> decode_column_tweaks()
     |> decode_keyword_tweaks()
     |> decode_filter_tweaks()
+    |> decode_ash_filterform_tweaks()
     |> MavuUtils.log("mwuits-debug 2022-07-19_09:20 decode_tweaks_from_string", :info)
   end
 
@@ -571,8 +592,16 @@ defmodule MavuList do
     |> Map.drop(["filters"])
     |> Map.put(:filters, filters |> AtomicMap.convert(safe: true, ignore: true))
   end
-
   defp decode_filter_tweaks(tweaks), do: tweaks
+
+
+  defp decode_ash_filterform_tweaks(%{"ash_filterform" => ash_filterform} = tweaks) do
+    tweaks
+    |> Map.drop(["ash_filterform"])
+    |> Map.put(:ash_filterform, ash_filterform)
+  end
+
+  defp decode_ash_filterform_tweaks(tweaks), do: tweaks
 
   defp decode_column_tweaks(%{"columns" => columns} = tweaks) do
     tweaks
@@ -602,4 +631,62 @@ defmodule MavuList do
       end
     end)
   end
+
+  @builtin_short_names [
+    map: "Ash.Type.Map",
+    keyword: "Ash.Type.Keyword",
+    term: "Ash.Type.Term",
+    atom: "Ash.Type.Atom",
+    string: "Ash.Type.String",
+    integera: "Ash.Type.Integer",
+    float: "Ash.Type.Float",
+    duration_name: "Ash.Type.DurationName",
+    function: "Ash.Type.Function",
+    boolean: "Ash.Type.Boolean",
+    struct: "Ash.Type.Struct",
+    uuid: "Ash.Type.UUID",
+    binary: "Ash.Type.Binary",
+    date: "Ash.Type.Date",
+    time: "Ash.Type.Time",
+    decimal: "Ash.Type.Decimal",
+    ci_string: "Ash.Type.CiString",
+    naive_datetime: "Ash.Type.NaiveDatetime",
+    utc_datetime: "Ash.Type.UtcDatetime",
+    utc_datetime_usec: "Ash.Type.UtcDatetimeUsec",
+    url_encoded_binary: "Ash.Type.UrlEncodedBinary",
+    union: "Ash.Type.Union",
+    module: "Ash.Type.Module"
+  ]
+  @custom_short_names Application.compile_env(:ash, :custom_types, [])
+
+  @short_names @custom_short_names ++ @builtin_short_names
+
+
+  def to_ash_shortname({:array,_}) do
+    :array
+  end
+
+
+  def to_ash_shortname(long_type) do
+    long_type_str=
+      long_type
+    |> to_string()
+    |> String.replace_prefix("Elixir.","")
+
+    @short_names
+    |> Enum.find_value(fn {shortname,longname}->
+      if longname==long_type_str  do
+        shortname
+      end
+   end)
+
+  end
+
+  def get_columns_from_ash_resource(resource_name) when is_atom(resource_name) do
+
+    Ash.Resource.Info.attributes(resource_name)
+    |> Enum.map(fn attr-> %{name: attr.name, type: attr.type |> to_ash_shortname()} end)
+
+  end
+
 end

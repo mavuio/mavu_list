@@ -39,7 +39,9 @@ defmodule MavuList.MixProject do
       {:atomic_map, ">= 0.8.0"},
       {:typed_struct, "~> 0.2.1"},
       {:ecto, ">= 3.0.0"},
-      {:ex_doc, ">= 0.0.0", only: :dev, runtime: false}
+      {:ex_doc, ">= 0.0.0", only: :dev, runtime: false},
+      {:ash, ">= 2.0.0", optional: true},
+      {:ash_phoenix, ">= 1.0.0", optional: true}
     ]
   end
 

@@ -144,14 +144,6 @@ defmodule MavuList do
   def apply_sort(data, conf, [[colname, direction]]) when is_map(conf) and is_list(data),
     do: Enum.sort_by(data, &get_sortable_colval(&1, conf, colname), direction)
 
-  # def apply_sort(%Ecto.Query{} = query, conf, [[colname, direction]]) when is_map(conf) do
-  #   db_colname = get_db_colname(conf, colname)
-
-  #   query
-  #   |> Ecto.Query.exclude(:order_by)
-  #   |> Ecto.Query.order_by([{^direction, ^db_colname}])
-  # end
-
   def apply_sort(%Ecto.Query{} = query, conf, sort_definitions)
       when is_list(sort_definitions) and is_map(conf) do
     sort_definitions_for_query = Enum.map(sort_definitions, &handle_sort_definition(&1, conf))

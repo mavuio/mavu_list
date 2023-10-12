@@ -665,6 +665,7 @@ defmodule MavuList do
         shortname
       end
     end)
+    |> MavuUtils.if_nil(long_type_str |> String.replace(".", "") |> Macro.underscore())
   end
 
   def get_columns_from_ash_resource(resource_name) when is_atom(resource_name) do

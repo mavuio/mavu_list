@@ -649,8 +649,8 @@ defmodule MavuList do
 
   @short_names @custom_short_names ++ @builtin_short_names
 
-  def to_ash_shortname({:array, _}) do
-    :array
+  def to_ash_shortname({:array, item_type}) do
+    "array_of_" <> to_ash_shortname(item_type)
   end
 
   def to_ash_shortname(long_type) do

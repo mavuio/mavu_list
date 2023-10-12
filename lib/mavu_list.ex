@@ -1,7 +1,6 @@
 defmodule MavuList do
   @moduledoc false
 
-
   @derive {Inspect, only: [:conf]}
 
   defstruct data: [],
@@ -479,21 +478,17 @@ defmodule MavuList do
     |> handle_data(source)
   end
 
-
-
   def handle_event_in_state(
-    "set_ash_filterform",
-    %{"filterform_params" => filterform_params},
-    source,
-    %__MODULE__{} = state
-  ) do
-
+        "set_ash_filterform",
+        %{"filterform_params" => filterform_params},
+        source,
+        %__MODULE__{} = state
+      ) do
     state
-    |> put_in([:tweaks, :ash_filterform], filterform_params )
+    |> put_in([:tweaks, :ash_filterform], filterform_params)
     |> put_in([:tweaks, :page], 1)
     |> handle_data(source)
-end
-
+  end
 
   def handle_event_in_state("reprocess", _, source, %__MODULE__{} = state) do
     state
@@ -584,8 +579,8 @@ end
     |> Map.drop(["filters"])
     |> Map.put(:filters, filters |> AtomicMap.convert(safe: true, ignore: true))
   end
-  defp decode_filter_tweaks(tweaks), do: tweaks
 
+  defp decode_filter_tweaks(tweaks), do: tweaks
 
   defp decode_ash_filterform_tweaks(%{"ash_filterform" => ash_filterform} = tweaks) do
     tweaks
@@ -630,7 +625,7 @@ end
     term: "Ash.Type.Term",
     atom: "Ash.Type.Atom",
     string: "Ash.Type.String",
-    integera: "Ash.Type.Integer",
+    integer: "Ash.Type.Integer",
     float: "Ash.Type.Float",
     duration_name: "Ash.Type.DurationName",
     function: "Ash.Type.Function",
@@ -647,38 +642,33 @@ end
     utc_datetime_usec: "Ash.Type.UtcDatetimeUsec",
     url_encoded_binary: "Ash.Type.UrlEncodedBinary",
     union: "Ash.Type.Union",
-    module: "Ash.Type.Module"
+    module: "Ash.Type.Module",
+    uuid: "AshUUID.UUID"
   ]
   @custom_short_names Application.compile_env(:ash, :custom_types, [])
 
   @short_names @custom_short_names ++ @builtin_short_names
 
-
-  def to_ash_shortname({:array,_}) do
+  def to_ash_shortname({:array, _}) do
     :array
   end
 
-
   def to_ash_shortname(long_type) do
-    long_type_str=
+    long_type_str =
       long_type
-    |> to_string()
-    |> String.replace_prefix("Elixir.","")
+      |> to_string()
+      |> String.replace_prefix("Elixir.", "")
 
     @short_names
-    |> Enum.find_value(fn {shortname,longname}->
-      if longname==long_type_str  do
+    |> Enum.find_value(fn {shortname, longname} ->
+      if longname == long_type_str do
         shortname
       end
-   end)
-
+    end)
   end
 
   def get_columns_from_ash_resource(resource_name) when is_atom(resource_name) do
-
     Ash.Resource.Info.attributes(resource_name)
-    |> Enum.map(fn attr-> %{name: attr.name, type: attr.type |> to_ash_shortname()} end)
-
+    |> Enum.map(fn attr -> %{name: attr.name, type: attr.type |> to_ash_shortname()} end)
   end
-
 end

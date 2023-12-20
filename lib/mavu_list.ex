@@ -365,7 +365,7 @@ defmodule MavuList do
   def get_label(nil, name) when is_atom(name), do: Phoenix.Naming.humanize(name)
 
   def get_col(%__MODULE__{} = state, name) when is_atom(name),
-    do: state.metadata.columns |> Enum.find(&(&1.name == name))
+    do: (state.metadata.columns ++ state.conf.columns) |> Enum.find(&(&1.name == name))
 
   def handle_event(event, msg, source, %__MODULE__{} = state) do
     # version A) handle state only

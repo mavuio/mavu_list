@@ -670,6 +670,27 @@ defmodule MavuList do
 
   def get_columns_from_ash_resource(resource_name) when is_atom(resource_name) do
     Ash.Resource.Info.attributes(resource_name)
-    |> Enum.map(fn attr -> %{name: attr.name, type: attr.type |> to_ash_shortname()} end)
+    |> Enum.map(fn attr ->
+      %{
+        name: attr.name,
+        type: attr.type |> to_ash_shortname(),
+        label: label_for_ash_attribute(resource_name, attr.name)
+      }
+    end)
+  end
+
+  def label_for_ash_attribute(resource, fieldname) when is_atom(fieldname) do
+    Ash.Resource.Info.attribute(resource, fieldname)
+    |> case do
+      %{description: d} when is_binary(d) -> d
+      _ -> get_human_name_for_atom(fieldname)
+    end
+  end
+
+  def get_human_name_for_atom(atom) when is_atom(atom) do
+    "#{atom}"
+    |> String.split("_")
+    |> Enum.map(&String.capitalize/1)
+    |> Enum.join(" ")
   end
 end

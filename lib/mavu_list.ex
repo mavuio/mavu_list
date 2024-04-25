@@ -359,10 +359,11 @@ defmodule MavuList do
     end
   end
 
-  def get_label(col, name) when is_atom(name) and is_map(col),
+  def get_label(col, name) when (is_binary(name) or is_atom(name)) and is_map(col),
     do: col[:label] || get_label(nil, name)
 
-  def get_label(nil, name) when is_atom(name), do: Phoenix.Naming.humanize(name)
+  def get_label(nil, name) when is_binary(name) or is_atom(name),
+    do: Phoenix.Naming.humanize(name)
 
   def get_col(%__MODULE__{} = state, name) when is_atom(name),
     do: (state.metadata.columns ++ state.conf.columns) |> Enum.find(&(&1.name == name))
@@ -528,8 +529,7 @@ defmodule MavuList do
     "#{fieldname}_tweaks"
   end
 
-  defp encode_tweaks_to_string(tweaks) when is_map(tweaks) do
-    tweaks |> MavuUtils.log("mwuits-debug 2022-07-19_09:13 encode_tweaks_to_string", :info)
+  def encode_tweaks_to_string(tweaks) when is_map(tweaks) do
     Jason.encode!(tweaks)
   end
 
@@ -541,7 +541,6 @@ defmodule MavuList do
     |> decode_keyword_tweaks()
     |> decode_filter_tweaks()
     |> decode_ash_filterform_tweaks()
-    |> MavuUtils.log("mwuits-debug 2022-07-19_09:20 decode_tweaks_from_string", :info)
   end
 
   defp decode_sort_tweaks(%{"sort_by" => sort_by} = tweaks) do

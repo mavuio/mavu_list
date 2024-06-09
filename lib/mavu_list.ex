@@ -271,10 +271,10 @@ defmodule MavuList do
     end
   end
 
-  def get_col_conf(conf, name) when is_map(conf) and is_atom(name) do
+  def get_col_conf(conf, name) when is_map(conf) and (is_atom(name) or is_binary(name)) do
     get_in(conf, [
       :columns,
-      Access.filter(&(&1.name == name))
+      Access.filter(&("#{&1.name}" == "#{name}"))
     ])
     |> List.first()
   end

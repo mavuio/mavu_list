@@ -11,6 +11,8 @@ defmodule MavuList do
 
   use Accessible
 
+  defguard is_atom_or_binary(value) when is_atom(value) or is_binary(value)
+
   @default_per_page 20
   require(Ecto.Query)
 
@@ -73,7 +75,7 @@ defmodule MavuList do
 
     Enum.with_index(columns, 100)
     |> Enum.map(fn {col, col_idx} ->
-      Enum.find(tweaks_w_index, fn {i, _tweak_idx} -> i.name == "#{col.name}" end)
+      Enum.find(tweaks_w_index, fn {i, _tweak_idx} -> "#{i.name}" == "#{col.name}" end)
       |> case do
         {%{visible: visible_from_tweak}, tweak_idx} ->
           {Map.put(col, :visible, visible_from_tweak), tweak_idx}
@@ -218,13 +220,20 @@ defmodule MavuList do
     data
   end
 
-  def is_user_sortable?(conf, name) when is_map(conf) and is_atom(name) do
+  def is_user_sortable?(conf, name) when is_map(conf) and is_atom_or_binary(name) do
     if get_col_conf(conf, name)[:user_sortable] == false do
       false
     else
       case get_db_colname(conf, name) do
-        nil -> false
-        _valid_colname -> true
+        nil ->
+          false
+
+        valid_colname ->
+          if "#{valid_colname}" =~ "." do
+            false
+          else
+            true
+          end
       end
     end
   end
@@ -244,7 +253,7 @@ defmodule MavuList do
     )
   end
 
-  def get_col_path(conf, name) when is_map(conf) and is_atom(name) do
+  def get_col_path(conf, name) when is_map(conf) and is_atom_or_binary(name) do
     get_col_conf(conf, name)
     |> case do
       %{path: path} when is_list(path) -> path
@@ -254,13 +263,13 @@ defmodule MavuList do
 
   def get_col_path(conf, path) when is_map(conf) and is_list(path), do: path
 
-  def get_db_colname(conf, name) when is_map(conf) and is_atom(name) do
+  def get_db_colname(conf, name) when is_map(conf) and is_atom_or_binary(name) do
     get_col_conf(conf, name)
     |> case do
       %{order_by_field: order_by_field} when not is_nil(order_by_field) ->
         order_by_field
 
-      %{path: [single_field_name]} when is_atom(single_field_name) ->
+      %{path: [single_field_name]} when is_atom_or_binary(single_field_name) ->
         single_field_name
 
       %{path: multiple_fieldnames} when is_list(multiple_fieldnames) ->
@@ -271,7 +280,7 @@ defmodule MavuList do
     end
   end
 
-  def get_col_conf(conf, name) when is_map(conf) and (is_atom(name) or is_binary(name)) do
+  def get_col_conf(conf, name) when is_map(conf) and is_atom_or_binary(name) do
     get_in(conf, [
       :columns,
       Access.filter(&("#{&1.name}" == "#{name}"))
@@ -298,7 +307,8 @@ defmodule MavuList do
     # query |> repo.aggregate(:count)
   end
 
-  def generate_assigns_for_label_component(%__MODULE__{} = state, name) when is_atom(name) do
+  def generate_assigns_for_label_component(%__MODULE__{} = state, name)
+      when is_atom_or_binary(name) do
     col = get_col(state, name)
 
     %{
@@ -333,7 +343,8 @@ defmodule MavuList do
 
   def get_target(%__MODULE__{} = state), do: "##{state.source_id}"
 
-  def get_sort_direction_of_column(%__MODULE__{} = state, name) when is_atom(name) do
+  def get_sort_direction_of_column(%__MODULE__{} = state, name)
+      when is_atom_or_binary(name) do
     get_sort_tweaks(state)
     |> Enum.filter(fn [col_name, _dir] -> col_name == name end)
     |> Enum.map(fn [_col_name, dir] -> dir end)
@@ -359,21 +370,22 @@ defmodule MavuList do
     end
   end
 
-  def get_label(col, name) when (is_binary(name) or is_atom(name)) and is_map(col),
+  def get_label(col, name) when is_atom_or_binary(name) and is_map(col),
     do: col[:label] || get_label(nil, name)
 
-  def get_label(nil, name) when is_binary(name) or is_atom(name),
+  def get_label(nil, name) when is_atom_or_binary(name),
     do: Phoenix.Naming.humanize(name)
 
-  def get_col(%__MODULE__{} = state, name) when is_atom(name),
-    do: (state.metadata.columns ++ state.conf.columns) |> Enum.find(&(&1.name == name))
+  def get_col(%__MODULE__{} = state, name) when is_atom_or_binary(name),
+    do: (state.metadata.columns ++ state.conf.columns) |> Enum.find(&("#{&1.name}" == "#{name}"))
 
   def handle_event(event, msg, source, %__MODULE__{} = state) do
     # version A) handle state only
     handle_event_in_state(event, msg, source, state)
   end
 
-  def handle_event(socket, event, msg, source, fieldname) when is_atom(fieldname) do
+  def handle_event(socket, event, msg, source, fieldname)
+      when is_atom_or_binary(fieldname) do
     # version B) handle socket
     socket
     |> Phoenix.Component.assign(
@@ -500,7 +512,7 @@ defmodule MavuList do
         %{assigns: %{context: %{current_url: current_url}}} = socket,
         fieldname
       )
-      when is_atom(fieldname) do
+      when is_atom_or_binary(fieldname) do
     # version A: use real push-event if @context is given in assigns
     next_url =
       MavuUtils.update_params_in_url(current_url, [
@@ -515,7 +527,7 @@ defmodule MavuList do
     |> Phoenix.LiveView.push_patch(to: next_path)
   end
 
-  def update_param_in_url(socket, fieldname) when is_atom(fieldname) do
+  def update_param_in_url(socket, fieldname) when is_atom_or_binary(fieldname) do
     # version B: update via JS only if no @context is given
 
     socket
@@ -525,7 +537,7 @@ defmodule MavuList do
     })
   end
 
-  def get_url_param_name(fieldname) when is_atom(fieldname) or is_binary(fieldname) do
+  def get_url_param_name(fieldname) when is_atom_or_binary(fieldname) do
     "#{fieldname}_tweaks"
   end
 
@@ -611,7 +623,7 @@ defmodule MavuList do
 
     cols_with_index
     |> Enum.map(fn {idx, col} ->
-      case Enum.find_index(pos_map, &(&1 == col["name"])) do
+      case Enum.find_index(pos_map, &("#{&1}" == "#{col["name"]}")) do
         nil -> {idx, col}
         new_idx -> {new_idx, col}
       end
@@ -678,7 +690,8 @@ defmodule MavuList do
     end)
   end
 
-  def label_for_ash_attribute(resource, fieldname) when is_atom(fieldname) do
+  def label_for_ash_attribute(resource, fieldname)
+      when is_atom_or_binary(fieldname) do
     Ash.Resource.Info.attribute(resource, fieldname)
     |> case do
       %{description: d} when is_binary(d) -> d
@@ -686,8 +699,8 @@ defmodule MavuList do
     end
   end
 
-  def get_human_name_for_atom(atom) when is_atom(atom) do
-    "#{atom}"
+  def get_human_name_for_atom(thing) when is_atom_or_binary(thing) do
+    "#{thing}"
     |> String.split("_")
     |> Enum.map(&String.capitalize/1)
     |> Enum.join(" ")

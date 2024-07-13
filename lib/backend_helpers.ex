@@ -1,5 +1,7 @@
 defmodule MavuList.BackendHelpers do
-  use Phoenix.HTML
+  import Phoenix.HTML
+  import Phoenix.HTML.Form
+  use PhoenixHTMLHelpers
 
   def tw_class(class_name, opts \\ [])
 

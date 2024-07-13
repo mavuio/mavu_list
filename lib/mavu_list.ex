@@ -191,10 +191,10 @@ defmodule MavuList do
   end
 
   if Code.ensure_loaded?(Ash) do
-    def apply_paging(%Ash.Query{} = query, %{api: api} = _conf, per_page, page)
+    def apply_paging(%Ash.Query{} = query, _conf, per_page, page)
         when is_integer(per_page) and is_integer(page) do
       query
-      |> api.read!(page: [limit: per_page, offset: per_page * (page - 1)])
+      |> Ash.read!(page: [limit: per_page, offset: per_page * (page - 1)])
       |> case do
         items when is_list(items) -> items
         %{results: items} -> items
@@ -296,8 +296,8 @@ defmodule MavuList do
   def get_length(source, _) when is_list(source), do: length(source)
 
   if Code.ensure_loaded?(Ash) do
-    def get_length(%Ash.Query{} = query, %{api: api} = _conf) do
-      api.read!(query, page: [limit: 1, count: true])
+    def get_length(%Ash.Query{} = query, _conf) do
+      Ash.read!(query, page: [limit: 1, count: true])
       |> Map.get(:count, 0)
     end
   end

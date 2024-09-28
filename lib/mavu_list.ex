@@ -178,19 +178,32 @@ defmodule MavuList do
     {direction, db_colname}
   end
 
-  def handle_sort_definition_for_ash([colname, direction], conf) do
-    db_colname = get_db_colname(conf, colname)
-
-    case direction do
-      :asc ->
-        db_colname
-
-      _ ->
-        {db_colname, direction}
-    end
-  end
-
   if Code.ensure_loaded?(Ash) do
+    def handle_sort_definition_for_ash([colname, direction], conf) do
+      db_colname = get_db_colname(conf, colname)
+
+      case Ash.Resource.Info.field(conf.ash_resource, db_colname) do
+        %Ash.Resource.Calculation{} = calc_conf ->
+          {db_colname, {get_args_for_calculation(calc_conf, conf[:preset_args]), direction}}
+
+        _ ->
+          case direction do
+            :asc ->
+              db_colname
+
+            _ ->
+              {db_colname, direction}
+          end
+      end
+    end
+
+    def get_args_for_calculation(%Ash.Resource.Calculation{} = calc_conf, preset_args) do
+      keys_for_calculation = Enum.map(calc_conf.arguments, & &1.name)
+
+      preset_args
+      |> Map.take(keys_for_calculation)
+    end
+
     def apply_paging(%Ash.Query{} = query, _conf, per_page, page)
         when is_integer(per_page) and is_integer(page) do
       query

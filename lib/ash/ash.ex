@@ -40,12 +40,12 @@ defmodule MavuList.Ash do
 
     def autoload_fields(
           %Ash.Query{} = query,
-          list = %MavuList{conf: conf, tweaks: %{ash_filterform: filterform_params}}
+          list = %MavuList{conf: conf}
         ) do
       filter_form =
         get_filterform_module(conf).new(conf[:ash_resource],
           mavu_list: list,
-          params: filterform_params || %{}
+          params: %{}
         )
 
       case get_filterform_module(conf).autoload_fields(query, filter_form) do

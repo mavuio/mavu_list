@@ -34,7 +34,8 @@ defmodule MavuList do
   def handle_incoming_tweaks(encoded_tweaks) when is_binary(encoded_tweaks) do
     encoded_tweaks
     |> decode_tweaks_from_string()
-    |> MavuUtils.log("mwuits-debug 2022-07-19_09:11 TWEAKS IN", :info)
+
+    # |> MavuUtils.log("mwuits-debug 2022-07-19_09:11 TWEAKS IN", :info)
   end
 
   def handle_incoming_tweaks(tweaks), do: tweaks || %{}

@@ -125,6 +125,7 @@ defmodule MavuList do
       source
       |> apply_filter(state.conf, state.tweaks)
       |> MavuList.Ash.apply_ash_filterform(state)
+      |> MavuList.Ash.autoload_fields(state)
       |> apply_sort(state.conf, get_sort_tweaks(state))
 
     paged_source =

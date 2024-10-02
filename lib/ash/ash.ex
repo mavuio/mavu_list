@@ -31,12 +31,25 @@ defmodule MavuList.Ash do
 
       case get_filterform_module(conf).filter(query, filter_form) do
         {:ok, modified_query} ->
-          # AshPhoenix.FilterForm.to_filter_expression(filter_form)
-          # |> MavuUtils.log(
-          #   "mwuits-debug 2023-08-10_17:57 [#{elem(__ENV__.function, 0)}]: clgreen",
-          #   :info
-          # )
+          modified_query
 
+        {:error, _filter_form} ->
+          query
+      end
+    end
+
+    def autoload_fields(
+          %Ash.Query{} = query,
+          list = %MavuList{conf: conf, tweaks: %{ash_filterform: filterform_params}}
+        ) do
+      filter_form =
+        get_filterform_module(conf).new(conf[:ash_resource],
+          mavu_list: list,
+          params: filterform_params || %{}
+        )
+
+      case get_filterform_module(conf).autoload_fields(query, filter_form) do
+        {:ok, modified_query} ->
           modified_query
 
         {:error, _filter_form} ->
@@ -46,6 +59,10 @@ defmodule MavuList.Ash do
   end
 
   def apply_ash_filterform(source, _mavu_list) do
+    source
+  end
+
+  def autoload_fields(source, _mavu_list) do
     source
   end
 end

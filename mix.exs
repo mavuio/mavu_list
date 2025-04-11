@@ -1,7 +1,7 @@
 defmodule MavuList.MixProject do
   use Mix.Project
 
-  @version "1.0.19"
+  @version "1.0.20"
   def project do
     [
       app: :mavu_list,
@@ -33,7 +33,7 @@ defmodule MavuList.MixProject do
       {:phoenix, ">= 1.7.0"},
       {:phoenix_live_view, ">= 0.19.0"},
       {:mavu_form, "~> 1.0.7"},
-      {:mavu_utils, "~> 1.0"},
+      # {:mavu_utils, "~> 1.0", optional: true},
       {:accessible, ">= 0.2.0"},
       {:jason, ">= 1.2.0"},
       {:atomic_map, ">= 0.8.0"},

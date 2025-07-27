@@ -503,6 +503,8 @@ defmodule MavuList do
       |> Map.new()
     end)
     |> put_in([:tweaks, :page], 1)
+    # reset ash filterform in this case:
+    |> put_in([:tweaks, :ash_filterform], %{})
     |> handle_data(source)
   end
 
@@ -514,6 +516,8 @@ defmodule MavuList do
       ) do
     state
     |> put_in([:tweaks, :ash_filterform], filterform_params)
+    # reset filters in this case:
+    |> put_in([:tweaks, :filters], %{})
     |> put_in([:tweaks, :page], 1)
     |> handle_data(source)
   end
